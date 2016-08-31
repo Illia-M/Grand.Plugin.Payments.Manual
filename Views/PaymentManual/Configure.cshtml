@@ -1,4 +1,4 @@
-﻿@{
+@{
     Layout = "";
 }
 @model Grand.Plugin.Payments.Manual.Models.ConfigurationModel
@@ -15,7 +15,7 @@
                     @Html.GrandLabelFor(model => model.TransactModeValues, new Dictionary<string, object> { { "class", "control-label" } }, false)
                 </div>
                 <div class="col-md-9 col-sm-9">
-                    @Html.DropDownList("TransactModeId", Model.TransactModeValues, new { @class = "control-label" })
+                    @Html.GrandDropDownListFor(model => model.TransactModeId, Model.TransactModeValues, new { @class = "control-label" })
                 </div>
             </div>
             <div class="form-group">
