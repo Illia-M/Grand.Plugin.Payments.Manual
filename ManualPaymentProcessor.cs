@@ -344,7 +344,15 @@ namespace Grand.Plugin.Payments.Manual
             }
         }
 
+        public string PaymentMethodDescription
+        {
+            get
+            {
+                return "";
+            }
+        }
+
         #endregion
-        
+
     }
 }
