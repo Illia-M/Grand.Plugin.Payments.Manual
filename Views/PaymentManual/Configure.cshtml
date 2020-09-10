@@ -2,7 +2,7 @@
     Layout = "";
 }
 @model Grand.Plugin.Payments.Manual.Models.ConfigurationModel
-@using Grand.Web.Framework;
+@using Grand.Framework
 @Html.Action("StoreScopeConfiguration", "Setting", new { area = "Admin" })
 @using (Html.BeginForm())
 {

@@ -1,10 +1,10 @@
-﻿using System.Web.Mvc;
-using Grand.Web.Framework;
-using Grand.Web.Framework.Mvc;
+﻿using Grand.Framework.Mvc.ModelBinding;
+using Grand.Framework.Mvc.Models;
+using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace Grand.Plugin.Payments.Manual.Models
 {
-    public class ConfigurationModel : BaseNopModel
+    public class ConfigurationModel : BaseGrandModel
     {
         public string ActiveStoreScopeConfiguration { get; set; }
 

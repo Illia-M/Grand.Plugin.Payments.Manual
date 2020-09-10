@@ -1,14 +1,15 @@
 using System;
 using System.Collections.Generic;
-using System.Web.Routing;
+using System.Threading.Tasks;
 using Grand.Core.Domain.Orders;
 using Grand.Core.Domain.Payments;
 using Grand.Core.Plugins;
-using Grand.Plugin.Payments.Manual.Controllers;
 using Grand.Services.Configuration;
 using Grand.Services.Localization;
 using Grand.Services.Orders;
 using Grand.Services.Payments;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 
 namespace Grand.Plugin.Payments.Manual
 {
@@ -22,29 +23,34 @@ namespace Grand.Plugin.Payments.Manual
         private readonly ManualPaymentSettings _manualPaymentSettings;
         private readonly ISettingService _settingService;
         private readonly IOrderTotalCalculationService _orderTotalCalculationService;
+        private readonly ILocalizationService _localizationService;
+        private readonly ILanguageService _languageService;
 
         #endregion
 
         #region Ctor
 
         public ManualPaymentProcessor(ManualPaymentSettings manualPaymentSettings,
-            ISettingService settingService, IOrderTotalCalculationService orderTotalCalculationService)
+            ISettingService settingService, IOrderTotalCalculationService orderTotalCalculationService,
+            ILocalizationService localizationService, ILanguageService languageService)
         {
             this._manualPaymentSettings = manualPaymentSettings;
             this._settingService = settingService;
             this._orderTotalCalculationService = orderTotalCalculationService;
+            _localizationService = localizationService;
+            _languageService = languageService;
         }
 
         #endregion
 
         #region Methods
-        
+
         /// <summary>
         /// Process a payment
         /// </summary>
         /// <param name="processPaymentRequest">Payment info required for an order processing</param>
         /// <returns>Process payment result</returns>
-        public ProcessPaymentResult ProcessPayment(ProcessPaymentRequest processPaymentRequest)
+        public async Task<ProcessPaymentResult> ProcessPayment(ProcessPaymentRequest processPaymentRequest)
         {
             var result = new ProcessPaymentResult();
 
@@ -74,9 +80,10 @@ namespace Grand.Plugin.Payments.Manual
         /// Post process payment (used by payment gateways that require redirecting to a third-party URL)
         /// </summary>
         /// <param name="postProcessPaymentRequest">Payment info required for an order processing</param>
-        public void PostProcessPayment(PostProcessPaymentRequest postProcessPaymentRequest)
+        public Task PostProcessPayment(PostProcessPaymentRequest postProcessPaymentRequest)
         {
             //nothing
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -84,21 +91,21 @@ namespace Grand.Plugin.Payments.Manual
         /// </summary>
         /// <param name="cart">Shoping cart</param>
         /// <returns>true - hide; false - display.</returns>
-        public bool HidePaymentMethod(IList<ShoppingCartItem> cart)
+        public Task<bool> HidePaymentMethod(IList<ShoppingCartItem> cart)
         {
             //you can put any logic here
             //for example, hide this payment method if all products in the cart are downloadable
             //or hide this payment method if current customer is from certain country
-            return false;
+            return Task.FromResult(false);
         }
 
         /// <summary>
         /// Gets additional handling fee
         /// </summary>
         /// <returns>Additional handling fee</returns>
-        public decimal GetAdditionalHandlingFee(IList<ShoppingCartItem> cart)
+        public async Task<decimal> GetAdditionalHandlingFee(IList<ShoppingCartItem> cart)
         {
-            var result = this.CalculateAdditionalFee(_orderTotalCalculationService,  cart,
+            var result = await this.CalculateAdditionalFee(_orderTotalCalculationService, cart,
                 _manualPaymentSettings.AdditionalFee, _manualPaymentSettings.AdditionalFeePercentage);
             return result;
         }
@@ -108,11 +115,11 @@ namespace Grand.Plugin.Payments.Manual
         /// </summary>
         /// <param name="capturePaymentRequest">Capture payment request</param>
         /// <returns>Capture payment result</returns>
-        public CapturePaymentResult Capture(CapturePaymentRequest capturePaymentRequest)
+        public Task<CapturePaymentResult> Capture(CapturePaymentRequest capturePaymentRequest)
         {
             var result = new CapturePaymentResult();
             result.AddError("Capture method not supported");
-            return result;
+            return Task.FromResult(result);
         }
 
         /// <summary>
@@ -120,11 +127,11 @@ namespace Grand.Plugin.Payments.Manual
         /// </summary>
         /// <param name="refundPaymentRequest">Request</param>
         /// <returns>Result</returns>
-        public RefundPaymentResult Refund(RefundPaymentRequest refundPaymentRequest)
+        public Task<RefundPaymentResult> Refund(RefundPaymentRequest refundPaymentRequest)
         {
             var result = new RefundPaymentResult();
             result.AddError("Refund method not supported");
-            return result;
+            return Task.FromResult(result);
         }
 
         /// <summary>
@@ -132,11 +139,11 @@ namespace Grand.Plugin.Payments.Manual
         /// </summary>
         /// <param name="voidPaymentRequest">Request</param>
         /// <returns>Result</returns>
-        public VoidPaymentResult Void(VoidPaymentRequest voidPaymentRequest)
+        public Task<VoidPaymentResult> Void(VoidPaymentRequest voidPaymentRequest)
         {
             var result = new VoidPaymentResult();
             result.AddError("Void method not supported");
-            return result;
+            return Task.FromResult(result);
         }
 
         /// <summary>
@@ -144,7 +151,7 @@ namespace Grand.Plugin.Payments.Manual
         /// </summary>
         /// <param name="processPaymentRequest">Payment info required for an order processing</param>
         /// <returns>Process payment result</returns>
-        public ProcessPaymentResult ProcessRecurringPayment(ProcessPaymentRequest processPaymentRequest)
+        public Task<ProcessPaymentResult> ProcessRecurringPayment(ProcessPaymentRequest processPaymentRequest)
         {
             var result = new ProcessPaymentResult();
 
@@ -163,11 +170,11 @@ namespace Grand.Plugin.Payments.Manual
                 default:
                     {
                         result.AddError("Not supported transaction type");
-                        return result;
+                        return Task.FromResult(result);
                     }
             }
-            
-            return result;
+
+            return Task.FromResult(result);
         }
 
         /// <summary>
@@ -175,10 +182,10 @@ namespace Grand.Plugin.Payments.Manual
         /// </summary>
         /// <param name="cancelPaymentRequest">Request</param>
         /// <returns>Result</returns>
-        public CancelRecurringPaymentResult CancelRecurringPayment(CancelRecurringPaymentRequest cancelPaymentRequest)
+        public Task<CancelRecurringPaymentResult> CancelRecurringPayment(CancelRecurringPaymentRequest cancelPaymentRequest)
         {
             //always success
-            return new CancelRecurringPaymentResult();
+            return Task.FromResult(new CancelRecurringPaymentResult());
         }
 
         /// <summary>
@@ -186,13 +193,13 @@ namespace Grand.Plugin.Payments.Manual
         /// </summary>
         /// <param name="order">Order</param>
         /// <returns>Result</returns>
-        public bool CanRePostProcessPayment(Order order)
+        public Task<bool> CanRePostProcessPayment(Order order)
         {
             if (order == null)
                 throw new ArgumentNullException("order");
 
             //it's not a redirection payment method. So we always return false
-            return false;
+            return Task.FromResult(false);
         }
 
         /// <summary>
@@ -221,46 +228,100 @@ namespace Grand.Plugin.Payments.Manual
             routeValues = new RouteValueDictionary { { "Namespaces", "Grand.Plugin.Payments.Manual.Controllers" }, { "area", null } };
         }
 
-        public Type GetControllerType()
-        {
-            return typeof(PaymentManualController);
-        }
-
-        public override void Install()
+        public override async Task Install()
         {
             //settings
-            var settings = new ManualPaymentSettings
-            {
+            var settings = new ManualPaymentSettings {
                 TransactMode = TransactMode.Pending
             };
-            _settingService.SaveSetting(settings);
+            await _settingService.SaveSetting(settings);
 
             //locales
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Manual.Fields.AdditionalFee", "Additional fee");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Manual.Fields.AdditionalFee.Hint", "Enter additional fee to charge your customers.");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Manual.Fields.AdditionalFeePercentage", "Additional fee. Use percentage");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Manual.Fields.AdditionalFeePercentage.Hint", "Determines whether to apply a percentage additional fee to the order total. If not enabled, a fixed value is used.");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Manual.Fields.TransactMode", "After checkout mark payment as");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Manual.Fields.TransactMode.Hint", "Specify transaction mode.");
-            
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Payments.Manual.Fields.AdditionalFee", "Additional fee");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Payments.Manual.Fields.AdditionalFee.Hint", "Enter additional fee to charge your customers.");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Payments.Manual.Fields.AdditionalFeePercentage", "Additional fee. Use percentage");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Payments.Manual.Fields.AdditionalFeePercentage.Hint", "Determines whether to apply a percentage additional fee to the order total. If not enabled, a fixed value is used.");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Payments.Manual.Fields.TransactMode", "After checkout mark payment as");
+            await this.AddOrUpdatePluginLocaleResource(_localizationService, _languageService, "Plugins.Payments.Manual.Fields.TransactMode.Hint", "Specify transaction mode.");
 
-            base.Install();
+
+            await base.Install();
         }
 
-        public override void Uninstall()
+        public override async Task Uninstall()
         {
             //settings
-            _settingService.DeleteSetting<ManualPaymentSettings>();
+            await _settingService.DeleteSetting<ManualPaymentSettings>();
 
             //locales
-            this.DeletePluginLocaleResource("Plugins.Payments.Manual.Fields.AdditionalFee");
-            this.DeletePluginLocaleResource("Plugins.Payments.Manual.Fields.AdditionalFee.Hint");
-            this.DeletePluginLocaleResource("Plugins.Payments.Manual.Fields.AdditionalFeePercentage");
-            this.DeletePluginLocaleResource("Plugins.Payments.Manual.Fields.AdditionalFeePercentage.Hint");
-            this.DeletePluginLocaleResource("Plugins.Payments.Manual.Fields.TransactMode");
-            this.DeletePluginLocaleResource("Plugins.Payments.Manual.Fields.TransactMode.Hint");
-            
-            base.Uninstall();
+            await this.DeletePluginLocaleResource(_localizationService, _languageService, "Plugins.Payments.Manual.Fields.AdditionalFee");
+            await this.DeletePluginLocaleResource(_localizationService, _languageService, "Plugins.Payments.Manual.Fields.AdditionalFee.Hint");
+            await this.DeletePluginLocaleResource(_localizationService, _languageService, "Plugins.Payments.Manual.Fields.AdditionalFeePercentage");
+            await this.DeletePluginLocaleResource(_localizationService, _languageService, "Plugins.Payments.Manual.Fields.AdditionalFeePercentage.Hint");
+            await this.DeletePluginLocaleResource(_localizationService, _languageService, "Plugins.Payments.Manual.Fields.TransactMode");
+            await this.DeletePluginLocaleResource(_localizationService, _languageService, "Plugins.Payments.Manual.Fields.TransactMode.Hint");
+
+            await base.Uninstall();
+        }
+
+        public async Task<IList<string>> ValidatePaymentForm(IFormCollection form)
+        {
+            return await Task.FromResult(new List<string>());
+        }
+
+        public Task<ProcessPaymentRequest> GetPaymentInfo(IFormCollection form)
+        {
+            return Task.FromResult(new ProcessPaymentRequest());
+        }
+
+        public void GetPublicViewComponent(out string viewComponentName)
+        {
+            viewComponentName = "PaymentManual";
+        }
+
+        /// <summary>
+        /// Gets a value indicating whether capture is supported
+        /// </summary>
+        Task<bool> IPaymentMethod.SupportCapture()
+        {
+            return Task.FromResult(false);
+        }
+
+        /// <summary>
+        /// Gets a value indicating whether partial refund is supported
+        /// </summary>
+        Task<bool> IPaymentMethod.SupportPartiallyRefund()
+        {
+            return Task.FromResult(true);
+        }
+
+        /// <summary>
+        /// Gets a value indicating whether refund is supported
+        /// </summary>
+        Task<bool> IPaymentMethod.SupportRefund()
+        {
+            return Task.FromResult(true);
+        }
+
+        /// <summary>
+        /// Gets a value indicating whether void is supported
+        /// </summary>
+        Task<bool> IPaymentMethod.SupportVoid()
+        {
+            return Task.FromResult(false);
+        }
+
+        /// <summary>
+        /// Gets a value indicating whether we should display a payment information page for this plugin
+        /// </summary>
+        Task<bool> IPaymentMethod.SkipPaymentInfo()
+        {
+            return Task.FromResult(false);
+        }
+
+        Task<string> IPaymentMethod.PaymentMethodDescription()
+        {
+            return Task.FromResult(string.Empty);
         }
 
         #endregion
@@ -268,91 +329,15 @@ namespace Grand.Plugin.Payments.Manual
         #region Properties
 
         /// <summary>
-        /// Gets a value indicating whether capture is supported
-        /// </summary>
-        public bool SupportCapture
-        {
-            get
-            {
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Gets a value indicating whether partial refund is supported
-        /// </summary>
-        public bool SupportPartiallyRefund
-        {
-            get
-            {
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Gets a value indicating whether refund is supported
-        /// </summary>
-        public bool SupportRefund
-        {
-            get
-            {
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Gets a value indicating whether void is supported
-        /// </summary>
-        public bool SupportVoid
-        {
-            get
-            {
-                return false;
-            }
-        }
-
-        /// <summary>
         /// Gets a recurring payment type of payment method
         /// </summary>
-        public RecurringPaymentType RecurringPaymentType
-        {
-            get
-            {
-                return RecurringPaymentType.Manual;
-            }
-        }
+        public RecurringPaymentType RecurringPaymentType => RecurringPaymentType.Manual;
 
         /// <summary>
         /// Gets a payment method type
         /// </summary>
-        public PaymentMethodType PaymentMethodType
-        {
-            get
-            {
-                return PaymentMethodType.Standard;
-            }
-        }
-        
-        /// <summary>
-        /// Gets a value indicating whether we should display a payment information page for this plugin
-        /// </summary>
-        public bool SkipPaymentInfo
-        {
-            get
-            {
-                return false;
-            }
-        }
-
-        public string PaymentMethodDescription
-        {
-            get
-            {
-                return "";
-            }
-        }
+        public PaymentMethodType PaymentMethodType => PaymentMethodType.Standard;
 
         #endregion
-
     }
 }

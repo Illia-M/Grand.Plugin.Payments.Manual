@@ -1,19 +1,31 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Web.Mvc;
 using Grand.Core;
+using Grand.Framework.Controllers;
+using Grand.Framework.Extensions;
 using Grand.Plugin.Payments.Manual.Models;
 using Grand.Plugin.Payments.Manual.Validators;
 using Grand.Services.Configuration;
 using Grand.Services.Localization;
 using Grand.Services.Payments;
 using Grand.Services.Stores;
-using Grand.Web.Framework;
-using Grand.Web.Framework.Controllers;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
+using Grand.Services.Configuration;
+using Grand.Framework.Controllers;
+using Grand.Framework.Mvc.Filters;
+using Microsoft.AspNetCore.Mvc;
+using Grand.Services.Localization;
+using System.Threading.Tasks;
+using Grand.Framework.Security.Authorization;
+using Grand.Services.Security;
 
 namespace Grand.Plugin.Payments.Manual.Controllers
 {
+    [AuthorizeAdmin]
+    [PermissionAuthorize(PermissionSystemName.PaymentMethods)]
     public class PaymentManualController : BasePaymentController
     {
         private readonly IWorkContext _workContext;
@@ -32,12 +44,10 @@ namespace Grand.Plugin.Payments.Manual.Controllers
             this._localizationService = localizationService;
         }
         
-        [AdminAuthorize]
-        [ChildActionOnly]
-        public ActionResult Configure()
+        public async Task<IActionResult> Configure()
         {
             //load settings for a chosen store scope
-            var storeScope = this.GetActiveStoreScopeConfiguration(_storeService, _workContext);
+            var storeScope = await this.GetActiveStoreScopeConfiguration(_storeService, _workContext);
             var manualPaymentSettings = _settingService.LoadSetting<ManualPaymentSettings>(storeScope);
 
             var model = new ConfigurationModel();
@@ -47,7 +57,7 @@ namespace Grand.Plugin.Payments.Manual.Controllers
             model.TransactModeValues = manualPaymentSettings.TransactMode.ToSelectList();
 
             model.ActiveStoreScopeConfiguration = storeScope;
-            if (!String.IsNullOrEmpty(storeScope))
+            if (!string.IsNullOrEmpty(storeScope))
             {
                 model.TransactModeId_OverrideForStore = _settingService.SettingExists(manualPaymentSettings, x => x.TransactMode, storeScope);
                 model.AdditionalFee_OverrideForStore = _settingService.SettingExists(manualPaymentSettings, x => x.AdditionalFee, storeScope);
@@ -58,15 +68,13 @@ namespace Grand.Plugin.Payments.Manual.Controllers
         }
 
         [HttpPost]
-        [AdminAuthorize]
-        [ChildActionOnly]
-        public ActionResult Configure(ConfigurationModel model)
+        public async Task<IActionResult> Configure(ConfigurationModel model)
         {
             if (!ModelState.IsValid)
-                return Configure();
+                return await Configure();
 
             //load settings for a chosen store scope
-            var storeScope = this.GetActiveStoreScopeConfiguration(_storeService, _workContext);
+            var storeScope = await this.GetActiveStoreScopeConfiguration(_storeService, _workContext);
             var manualPaymentSettings = _settingService.LoadSetting<ManualPaymentSettings>(storeScope);
 
             //save settings
@@ -78,30 +86,29 @@ namespace Grand.Plugin.Payments.Manual.Controllers
              * This behavior can increase performance because cached settings will not be cleared 
              * and loaded from database after each update */
 
-            if (model.TransactModeId_OverrideForStore || String.IsNullOrEmpty(storeScope))
-                _settingService.SaveSetting(manualPaymentSettings, x => x.TransactMode, storeScope, false);
-            else if (!String.IsNullOrEmpty(storeScope))
-                _settingService.DeleteSetting(manualPaymentSettings, x => x.TransactMode, storeScope);
+            if (model.TransactModeId_OverrideForStore || string.IsNullOrEmpty(storeScope))
+                await _settingService.SaveSetting(manualPaymentSettings, x => x.TransactMode, storeScope, false);
+            else if (!string.IsNullOrEmpty(storeScope))
+                await _settingService.DeleteSetting(manualPaymentSettings, x => x.TransactMode, storeScope);
 
-            if (model.AdditionalFee_OverrideForStore || String.IsNullOrEmpty(storeScope))
-                _settingService.SaveSetting(manualPaymentSettings, x => x.AdditionalFee, storeScope, false);
-            else if (!String.IsNullOrEmpty(storeScope))
-                _settingService.DeleteSetting(manualPaymentSettings, x => x.AdditionalFee, storeScope);
+            if (model.AdditionalFee_OverrideForStore || string.IsNullOrEmpty(storeScope))
+                await _settingService.SaveSetting(manualPaymentSettings, x => x.AdditionalFee, storeScope, false);
+            else if (!string.IsNullOrEmpty(storeScope))
+                await _settingService.DeleteSetting(manualPaymentSettings, x => x.AdditionalFee, storeScope);
 
-            if (model.AdditionalFeePercentage_OverrideForStore || String.IsNullOrEmpty(storeScope))
-                _settingService.SaveSetting(manualPaymentSettings, x => x.AdditionalFeePercentage, storeScope, false);
-            else if (!String.IsNullOrEmpty(storeScope))
-                _settingService.DeleteSetting(manualPaymentSettings, x => x.AdditionalFeePercentage, storeScope);
+            if (model.AdditionalFeePercentage_OverrideForStore || string.IsNullOrEmpty(storeScope))
+                await _settingService.SaveSetting(manualPaymentSettings, x => x.AdditionalFeePercentage, storeScope, false);
+            else if (!string.IsNullOrEmpty(storeScope))
+                await _settingService.DeleteSetting(manualPaymentSettings, x => x.AdditionalFeePercentage, storeScope);
 
             //now clear settings cache
-            _settingService.ClearCache();
+           await _settingService.ClearCache();
 
             SuccessNotification(_localizationService.GetResource("Admin.Plugins.Saved"));
 
-            return Configure();
+            return await Configure();
         }
 
-        [ChildActionOnly]
         public ActionResult PaymentInfo()
         {
             var model = new PaymentInfoModel();
@@ -169,7 +176,7 @@ namespace Grand.Plugin.Payments.Manual.Controllers
         }
 
         [NonAction]
-        public override IList<string> ValidatePaymentForm(FormCollection form)
+        public  Task<IList<string>> ValidatePaymentForm(FormCollection form)
         {
             var warnings = new List<string>();
 
@@ -187,11 +194,11 @@ namespace Grand.Plugin.Payments.Manual.Controllers
             if (!validationResult.IsValid)
                 foreach (var error in validationResult.Errors)
                     warnings.Add(error.ErrorMessage);
-            return warnings;
+            return Task.FromResult<IList<string>>(warnings);
         }
 
         [NonAction]
-        public override ProcessPaymentRequest GetPaymentInfo(FormCollection form)
+        public  Task<ProcessPaymentRequest> ProcessPaymentRequestGetPaymentInfo(FormCollection form)
         {
             var paymentInfo = new ProcessPaymentRequest();
             paymentInfo.CreditCardType = form["CreditCardType"];
@@ -200,7 +207,7 @@ namespace Grand.Plugin.Payments.Manual.Controllers
             paymentInfo.CreditCardExpireMonth = int.Parse(form["ExpireMonth"]);
             paymentInfo.CreditCardExpireYear = int.Parse(form["ExpireYear"]);
             paymentInfo.CreditCardCvv2 = form["CardCode"];
-            return paymentInfo;
+            return Task.FromResult(paymentInfo);
         }
     }
 }
